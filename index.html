@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kartu Gudang — Stock Opname</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --paper:#EDEAE0;
+    --paper-raised:#F6F4EC;
+    --ink:#211F1B;
+    --ink-soft:#5B564C;
+    --navy:#26374A;
+    --navy-deep:#1B2836;
+    --amber:#AD7726;
+    --amber-soft:#F1E4C9;
+    --green:#3B6E52;
+    --green-soft:#E4EEE7;
+    --rust:#9C4331;
+    --rust-soft:#F3E2DD;
+    --line:#D3CDBC;
+    --line-strong:#B8B09A;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    line-height:1.5;
+  }
+  h1,h2,h3,.display{
+    font-family:'Roboto Slab', serif;
+    font-weight:700;
+    color:var(--navy-deep);
+    margin:0;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:'IBM Plex Sans', sans-serif;}
+
+  /* ---------- layout shell ---------- */
+  #app{display:flex;min-height:100vh;}
+
+  .sidebar{
+    width:222px;
+    flex:none;
+    background:var(--navy-deep);
+    color:#D9DEE4;
+    display:flex;
+    flex-direction:column;
+    padding:22px 0 16px;
+  }
+  .brand{
+    padding:0 20px 20px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+    margin-bottom:10px;
+  }
+  .brand .stamp{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.06em;
+    color:var(--amber-soft);
+    border:1px solid var(--amber);
+    padding:2px 6px;
+    border-radius:2px;
+    margin-bottom:8px;
+  }
+  .brand h1{
+    color:#fff;
+    font-size:19px;
+    line-height:1.25;
+  }
+  .brand .sub{
+    font-size:11.5px;
+    color:#9FA9B5;
+    margin-top:4px;
+  }
+  nav.navlist{display:flex;flex-direction:column;padding:8px 10px;gap:2px;flex:1;}
+  nav.navlist button{
+    display:flex;align-items:center;gap:10px;
+    background:transparent;border:none;
+    color:#C4CBD4;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:3px;
+    font-size:13.5px;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  nav.navlist button svg{flex:none;opacity:0.85;}
+  nav.navlist button:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  nav.navlist button.active{background:var(--amber);color:#241705;font-weight:600;}
+  nav.navlist button.active svg{opacity:1;}
+  .sidebar-foot{padding:10px 20px 0;border-top:1px solid rgba(255,255,255,0.12);}
+  .sidebar-foot button{
+    background:none;border:none;color:#8892A0;font-size:11.5px;cursor:pointer;padding:8px 0;
+    text-decoration:underline;text-underline-offset:2px;
+  }
+  .sidebar-foot button:hover{color:#D9DEE4;}
+
+  main{flex:1;padding:30px 38px 60px;max-width:1180px;}
+  .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;gap:16px;flex-wrap:wrap;}
+  .pagehead h2{font-size:24px;}
+  .pagehead p{margin:6px 0 0;color:var(--ink-soft);font-size:13px;max-width:52ch;}
+
+  /* ---------- reusable bits ---------- */
+  .card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px 22px;
+  }
+  .card + .card{margin-top:16px;}
+  .grid{display:grid;gap:16px;}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+  .grid.cols-2{grid-template-columns:1fr 1fr;}
+  @media (max-width:900px){
+    .grid.cols-4{grid-template-columns:repeat(2,1fr);}
+    .grid.cols-2{grid-template-columns:1fr;}
+  }
+
+  .stat{
+    background:var(--paper-raised);border:1px solid var(--line);border-radius:4px;
+    padding:16px 18px;
+  }
+  .stat .label{font-size:11.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .stat .value{font-family:'Roboto Slab',serif;font-size:28px;color:var(--navy-deep);margin-top:6px;}
+  .stat .value.warn{color:var(--rust);}
+  .stat .foot{font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;font-weight:600;color:var(--ink-soft);
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
+    border-bottom:1.5px solid var(--line-strong);
+    padding:8px 10px;background:transparent;
+  }
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:hover{background:rgba(0,0,0,0.02);}
+  td.num, th.num{text-align:right;font-family:'IBM Plex Mono',monospace;}
+  .tag-code{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+    border:1px solid var(--line-strong);border-radius:2px;
+    padding:1px 6px;background:#fff;color:var(--navy-deep);
+  }
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;}
+  .pill.in{background:var(--green-soft);color:var(--green);}
+  .pill.out{background:var(--rust-soft);color:var(--rust);}
+  .pill.adj{background:var(--amber-soft);color:var(--amber);}
+
+  label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
+  input[type=text],input[type=number],input[type=date],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:3px;
+    background:#fff;color:var(--ink);font-size:13.5px;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--navy);outline-offset:1px;}
+  .field{margin-bottom:12px;}
+  .field-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:9px 16px;border-radius:3px;border:1px solid transparent;
+    font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .btn-primary{background:var(--navy-deep);color:#fff;}
+  .btn-primary:hover{background:var(--navy);}
+  .btn-amber{background:var(--amber);color:#241705;}
+  .btn-amber:hover{filter:brightness(1.05);}
+  .btn-ghost{background:transparent;border:1px solid var(--line-strong);color:var(--ink);}
+  .btn-ghost:hover{background:rgba(0,0,0,0.04);}
+  .btn-danger-text{background:none;border:none;color:var(--rust);cursor:pointer;font-size:12.5px;text-decoration:underline;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn[disabled]{opacity:0.45;cursor:not-allowed;}
+
+  .empty{
+    padding:34px 20px;text-align:center;color:var(--ink-soft);
+    border:1.5px dashed var(--line-strong);border-radius:4px;font-size:13px;
+  }
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    background:var(--navy-deep);color:#fff;padding:10px 18px;border-radius:4px;
+    font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:999;
+    opacity:0;pointer-events:none;transition:opacity .25s ease, transform .25s ease;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+  .toast.err{background:var(--rust);}
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(20,20,15,0.45);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:40px 16px;z-index:900;overflow:auto;
+  }
+  .modal{
+    background:var(--paper-raised);border:1px solid var(--line);border-radius:5px;
+    width:100%;max-width:460px;padding:22px 24px;
+  }
+  .modal h3{font-size:17px;margin-bottom:14px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .hidden{display:none !important;}
+
+  .section-title{font-size:14px;font-weight:600;color:var(--navy-deep);margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .section-title .swatch{width:9px;height:9px;border-radius:50%;}
+
+  .diff-pos{color:var(--green);font-weight:600;}
+  .diff-neg{color:var(--rust);font-weight:600;}
+  .diff-zero{color:var(--ink-soft);}
+
+  select.item-select{max-width:340px;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .toolbar input,.toolbar select{width:auto;}
+  .search-input{min-width:220px;}
+
+  /* ---------- print ---------- */
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:14px;}
+    .no-print{display:none !important;}
+  }
+  .kartu-print-head{border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px;}
+  .kartu-print-head .co{font-family:'Roboto Slab',serif;font-weight:700;font-size:16px;}
+  .kartu-print-head .addr{font-size:11px;color:#333;}
+  .kartu-print-title{font-family:'Roboto Slab',serif;font-weight:700;font-size:14px;letter-spacing:.03em;margin:10px 0;text-transform:uppercase;}
+  .kartu-meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px;font-size:12px;margin-bottom:10px;}
+  .kartu-meta div span.k{color:#444;display:inline-block;width:105px;}
+  #printArea table{font-size:11.5px;}
+  #printArea thead th{border-bottom:1.5px solid #111;color:#111;}
+  #printArea tbody td{border-bottom:1px solid #999;}
+  #printArea tfoot td{border-top:1.5px solid #111;padding-top:6px;}
+  #printArea .sig{display:grid;grid-template-columns:1fr 1fr;margin-top:40px;font-size:12px;text-align:center;}
+  #printArea .sig .line{margin-top:50px;border-top:1px solid #111;padding-top:4px;}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="stamp">GUDANG · MUTASI STOK</span>
+      <h1 id="brandName">Kartu Gudang</h1>
+      <div class="sub" id="brandSub">Stock opname &amp; kartu stok</div>
+    </div>
+    <nav class="navlist" id="navlist"></nav>
+    <div class="sidebar-foot">
+      <button id="resetDataBtn">Hapus semua data</button>
+    </div>
+  </aside>
+
+  <main id="mainContent"></main>
+</div>
+
+<div id="printArea"></div>
+<div id="toast" class="toast"></div>
+<div id="modalRoot"></div>
+
+<script>
+/* =========================================================
+   ICONS
+========================================================= */
+const ICONS = {
+  dashboard:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
+  master:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.27 6.96 12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>',
+  masuk:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>',
+  keluar:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>',
+  opname:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  kartu:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="9" width="12" height="8"/><path d="M6 18h12"/><path d="M6 9V4h12v5"/><path d="M4 9h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z"/></svg>',
+  settings:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
+  plus:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  printer:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+};
+
+/* =========================================================
+   DATA LAYER  (Supabase — project: stock-opname-gudang)
+========================================================= */
+const SUPABASE_URL = 'https://ibivgonbdwbnugfkrvry.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImliaXZnb25iZHdibnVnZmtydnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMzM1NzgsImV4cCI6MjEwMzgwOTU3OH0.5hfUz6DPcYVnJZuzVXgzS_CWEqXGPeemMemSocx-Ie0';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let DB = { items: [], trx: [], opname: [], settings: { company:'Nama Perusahaan Anda', address:'' } };
+
+function mapItemRow(r){ return { code:r.code, name:r.name, category:r.category||'', unit:r.unit, location:r.location||'', initialStock:Number(r.initial_stock), minStock:Number(r.min_stock) }; }
+function mapTrxRow(r){ return { id:r.id, itemCode:r.item_code, type:r.type, qty:Number(r.qty), date:r.date, doc:r.doc||'', note:r.note||'', createdAt:r.created_at }; }
+
+async function loadAll(){
+  const [itemsRes, trxRes, opRes, entRes, setRes] = await Promise.all([
+    sb.from('items').select('*').order('code'),
+    sb.from('transactions').select('*'),
+    sb.from('opname_sessions').select('*').order('date', { ascending:false }),
+    sb.from('opname_entries').select('*'),
+    sb.from('settings').select('*').eq('id', 1).maybeSingle(),
+  ]);
+  if(itemsRes.error || trxRes.error || opRes.error || entRes.error || setRes.error){
+    showToast('Gagal memuat data dari database.', true);
+    console.error(itemsRes.error||trxRes.error||opRes.error||entRes.error||setRes.error);
+    return;
+  }
+  DB.items = itemsRes.data.map(mapItemRow);
+  DB.trx = trxRes.data.map(mapTrxRow);
+  const entriesBySession = {};
+  entRes.data.forEach(e=>{
+    (entriesBySession[e.opname_id] ||= []).push({ itemCode:e.item_code, systemQty:Number(e.system_qty), physicalQty:Number(e.physical_qty), diff:Number(e.diff), note:e.note||'' });
+  });
+  DB.opname = opRes.data.map(o=> ({ id:o.id, date:o.date, note:o.note||'', entries: entriesBySession[o.id]||[] }));
+  DB.settings = setRes.data ? { company:setRes.data.company, address:setRes.data.address||'' } : DB.settings;
+}
+
+async function dbCreateItem(item){
+  const { data, error } = await sb.from('items').insert({
+    code:item.code, name:item.name, category:item.category||null, unit:item.unit,
+    location:item.location||null, initial_stock:item.initialStock, min_stock:item.minStock
+  }).select().single();
+  if(error) throw error;
+  return mapItemRow(data);
+}
+async function dbUpdateItem(code, patch){
+  const { error } = await sb.from('items').update({
+    name:patch.name, category:patch.category||null, unit:patch.unit,
+    location:patch.location||null, min_stock:patch.minStock
+  }).eq('code', code);
+  if(error) throw error;
+}
+async function dbDeleteItem(code){
+  const { error } = await sb.from('items').delete().eq('code', code);
+  if(error) throw error;
+}
+async function dbCreateTrx(trx){
+  const { data, error } = await sb.from('transactions').insert({
+    item_code:trx.itemCode, type:trx.type, qty:trx.qty, date:trx.date, doc:trx.doc||null, note:trx.note||null
+  }).select().single();
+  if(error) throw error;
+  return mapTrxRow(data);
+}
+async function dbDeleteTrx(id){
+  const { error } = await sb.from('transactions').delete().eq('id', id);
+  if(error) throw error;
+}
+async function dbCreateOpname(date, entries, note){
+  const { data: session, error: sErr } = await sb.from('opname_sessions').insert({ date, note }).select().single();
+  if(sErr) throw sErr;
+  if(entries.length){
+    const { error: eErr } = await sb.from('opname_entries').insert(entries.map(e=>({
+      opname_id: session.id, item_code:e.itemCode, system_qty:e.systemQty, physical_qty:e.physicalQty, diff:e.diff, note:e.note||null
+    })));
+    if(eErr) throw eErr;
+  }
+  return session.id;
+}
+async function dbSaveSettings(settings){
+  const { error } = await sb.from('settings').upsert({ id:1, company:settings.company, address:settings.address||'' });
+  if(error) throw error;
+}
+async function dbResetAll(){
+  await sb.from('opname_entries').delete().not('id','is',null);
+  await sb.from('opname_sessions').delete().not('id','is',null);
+  await sb.from('transactions').delete().not('id','is',null);
+  await sb.from('items').delete().not('code','is',null);
+  await sb.from('settings').upsert({ id:1, company:'Nama Perusahaan Anda', address:'' });
+}
+
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  if(!iso) return '-';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function fmtNum(n){ return Number(n||0).toLocaleString('id-ID'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+/* stock helpers */
+function itemByCode(code){ return DB.items.find(i=>i.code===code); }
+function trxForItem(code){ return DB.trx.filter(t=>t.itemCode===code).sort((a,b)=> (a.date+a.createdAt) < (b.date+b.createdAt) ? -1 : 1); }
+function currentStock(code){
+  const item = itemByCode(code);
+  if(!item) return 0;
+  let stock = Number(item.initialStock||0);
+  DB.trx.forEach(t=>{
+    if(t.itemCode!==code) return;
+    stock += t.type==='in' ? Number(t.qty) : -Number(t.qty);
+  });
+  return stock;
+}
+
+/* =========================================================
+   APP SHELL / ROUTING
+========================================================= */
+const ROUTES = [
+  { id:'dashboard', label:'Dashboard', icon:ICONS.dashboard },
+  { id:'master', label:'Master Barang', icon:ICONS.master },
+  { id:'masuk', label:'Barang Masuk', icon:ICONS.masuk },
+  { id:'keluar', label:'Barang Keluar', icon:ICONS.keluar },
+  { id:'opname', label:'Stok Opname', icon:ICONS.opname },
+  { id:'kartu', label:'Kartu Stok', icon:ICONS.kartu },
+  { id:'settings', label:'Pengaturan', icon:ICONS.settings },
+];
+let currentRoute = 'dashboard';
+let kartuSelectedCode = null;
+
+function renderNav(){
+  const nav = document.getElementById('navlist');
+  nav.innerHTML = ROUTES.map(r=>`
+    <button data-route="${r.id}" class="${currentRoute===r.id?'active':''}">${r.icon}<span>${r.label}</span></button>
+  `).join('');
+  nav.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ currentRoute = btn.dataset.route; render(); });
+  });
+}
+
+function render(){
+  renderNav();
+  const main = document.getElementById('mainContent');
+  document.getElementById('brandName').textContent = DB.settings.company || 'Kartu Gudang';
+  switch(currentRoute){
+    case 'dashboard': main.innerHTML = viewDashboard(); bindDashboard(); break;
+    case 'master': main.innerHTML = viewMaster(); bindMaster(); break;
+    case 'masuk': main.innerHTML = viewTransaksi('in'); bindTransaksi('in'); break;
+    case 'keluar': main.innerHTML = viewTransaksi('out'); bindTransaksi('out'); break;
+    case 'opname': main.innerHTML = viewOpname(); bindOpname(); break;
+    case 'kartu': main.innerHTML = viewKartu(); bindKartu(); break;
+    case 'settings': main.innerHTML = viewSettings(); bindSettings(); break;
+  }
+}
+
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> t.className='toast', 2200);
+}
+
+function openModal(html){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-backdrop" id="modalBackdrop"><div class="modal">${html}</div></div>`;
+  document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+    if(e.target.id==='modalBackdrop') closeModal();
+  });
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+function viewDashboard(){
+  const totalItems = DB.items.length;
+  const today = todayISO();
+  const inToday = DB.trx.filter(t=>t.type==='in' && t.date===today).reduce((s,t)=>s+Number(t.qty),0);
+  const outToday = DB.trx.filter(t=>t.type==='out' && t.date===today).reduce((s,t)=>s+Number(t.qty),0);
+  const lowStock = DB.items.filter(i=> currentStock(i.code) <= Number(i.minStock||0));
+
+  const recent = [...DB.trx].sort((a,b)=> (b.date+b.createdAt) > (a.date+a.createdAt) ? 1 : -1).slice(0,8);
+
+  return `
+    <div class="pagehead">
+      <div><h2>Dashboard</h2><p>Ringkasan aktivitas gudang hari ini, ${fmtDate(today)}.</p></div>
+    </div>
+    <div class="grid cols-4">
+      <div class="stat"><div class="label">Total item terdaftar</div><div class="value">${fmtNum(totalItems)}</div><div class="foot">di master barang</div></div>
+      <div class="stat"><div class="label">Masuk hari ini</div><div class="value" style="color:var(--green)">+${fmtNum(inToday)}</div><div class="foot">unit diterima</div></div>
+      <div class="stat"><div class="label">Keluar hari ini</div><div class="value" style="color:var(--rust)">-${fmtNum(outToday)}</div><div class="foot">unit dikeluarkan</div></div>
+      <div class="stat"><div class="label">Stok di bawah minimum</div><div class="value ${lowStock.length?'warn':''}">${fmtNum(lowStock.length)}</div><div class="foot">item perlu diisi ulang</div></div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:16px;">
+      <div class="card">
+        <div class="section-title"><span class="swatch" style="background:var(--rust)"></span>Perlu perhatian — stok rendah</div>
+        ${lowStock.length ? `
+          <table><thead><tr><th>Kode</th><th>Nama Barang</th><th class="num">Stok</th><th class="num">Minimum</th></tr></thead>
+          <tbody>${lowStock.slice(0,6).map(i=>`
+            <tr><td><span class="tag-code">${esc(i.code)}</span></td><td>${esc(i.name)}</td><td class="num">${fmtNum(currentStock(i.code))} ${esc(i.unit)}</td><td class="num">${fmtNum(i.minStock)}</td></tr>
+          `).join('')}</tbody></table>
+        ` : `<div class="empty">Semua stok masih di atas batas minimum.</div>`}
+      </div>
+      <div class="card">
+        <div class="section-title"><span class="swatch" style="background:var(--navy)"></span>Mutasi terbaru</div>
+        ${recent.length ? `
+          <table><thead><tr><th>Tanggal</th><th>Kode</th><th>Tipe</th><th class="num">Qty</th></tr></thead>
+          <tbody>${recent.map(t=>`
+            <tr><td>${fmtDate(t.date)}</td><td><span class="tag-code">${esc(t.itemCode)}</span></td>
+            <td><span class="pill ${t.type==='in'?'in':(t.note&&t.note.startsWith('Penyesuaian')?'adj':'out')}">${t.type==='in'?'Masuk':'Keluar'}</span></td>
+            <td class="num">${fmtNum(t.qty)}</td></tr>
+          `).join('')}</tbody></table>
+        ` : `<div class="empty">Belum ada transaksi tercatat.</div>`}
+      </div>
+    </div>
+  `;
+}
+function bindDashboard(){}
+
+/* =========================================================
+   MASTER BARANG
+========================================================= */
+function viewMaster(){
+  return `
+    <div class="pagehead">
+      <div><h2>Master Barang</h2><p>Daftar barang yang dikelola di gudang, lengkap dengan satuan dan batas stok minimum.</p></div>
+      <button class="btn btn-primary" id="btnAddItem">${ICONS.plus} Tambah Barang</button>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" class="search-input" id="masterSearch" placeholder="Cari kode atau nama barang...">
+      </div>
+      <div id="masterTableWrap"></div>
+    </div>
+  `;
+}
+function masterTable(filter){
+  const q = (filter||'').toLowerCase().trim();
+  const rows = DB.items.filter(i => !q || i.code.toLowerCase().includes(q) || i.name.toLowerCase().includes(q));
+  if(!DB.items.length) return `<div class="empty">Belum ada barang. Klik "Tambah Barang" untuk memulai.</div>`;
+  if(!rows.length) return `<div class="empty">Tidak ada barang yang cocok dengan pencarian.</div>`;
+  return `
+    <table><thead><tr>
+      <th>Kode</th><th>Nama Barang</th><th>Kategori</th><th>Satuan</th><th>Lokasi</th>
+      <th class="num">Stok Awal</th><th class="num">Stok Saat Ini</th><th class="num">Min.</th><th></th>
+    </tr></thead>
+    <tbody>${rows.map(i=>{
+      const stock = currentStock(i.code);
+      const low = stock <= Number(i.minStock||0);
+      return `<tr>
+        <td><span class="tag-code">${esc(i.code)}</span></td>
+        <td>${esc(i.name)}</td>
+        <td>${esc(i.category)||'-'}</td>
+        <td>${esc(i.unit)}</td>
+        <td>${esc(i.location)||'-'}</td>
+        <td class="num">${fmtNum(i.initialStock)}</td>
+        <td class="num" style="${low?'color:var(--rust);font-weight:600':''}">${fmtNum(stock)}</td>
+        <td class="num">${fmtNum(i.minStock)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" data-edit="${esc(i.code)}">Ubah</button>
+          <button class="btn-danger-text" data-del="${esc(i.code)}">Hapus</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table>
+  `;
+}
+function bindMaster(){
+  const wrap = document.getElementById('masterTableWrap');
+  wrap.innerHTML = masterTable('');
+  document.getElementById('masterSearch').addEventListener('input', (e)=>{
+    wrap.innerHTML = masterTable(e.target.value);
+    bindMasterRowActions();
+  });
+  document.getElementById('btnAddItem').addEventListener('click', ()=> openItemModal(null));
+  bindMasterRowActions();
+}
+function bindMasterRowActions(){
+  document.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> openItemModal(b.dataset.edit)));
+  document.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> confirmDeleteItem(b.dataset.del)));
+}
+function openItemModal(code){
+  const editing = code ? itemByCode(code) : null;
+  openModal(`
+    <h3>${editing ? 'Ubah Barang' : 'Tambah Barang'}</h3>
+    <form id="itemForm">
+      <div class="field-row">
+        <div class="field"><label>Kode Barang</label><input type="text" id="f_code" value="${editing?esc(editing.code):''}" ${editing?'readonly style="background:#eee"':''} required></div>
+        <div class="field"><label>Satuan (pcs, box, kg...)</label><input type="text" id="f_unit" value="${editing?esc(editing.unit):''}" required></div>
+      </div>
+      <div class="field"><label>Nama Barang</label><input type="text" id="f_name" value="${editing?esc(editing.name):''}" required></div>
+      <div class="field-row">
+        <div class="field"><label>Kategori</label><input type="text" id="f_category" value="${editing?esc(editing.category):''}"></div>
+        <div class="field"><label>Lokasi Rak</label><input type="text" id="f_location" value="${editing?esc(editing.location):''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Stok Awal</label><input type="number" id="f_initial" min="0" value="${editing?editing.initialStock:0}" ${editing?'readonly style="background:#eee"':''} required></div>
+        <div class="field"><label>Stok Minimum</label><input type="number" id="f_min" min="0" value="${editing?editing.minStock:0}" required></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelModal">Batal</button>
+        <button type="submit" class="btn btn-primary">${editing?'Simpan Perubahan':'Simpan Barang'}</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('cancelModal').addEventListener('click', closeModal);
+  document.getElementById('itemForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const code = document.getElementById('f_code').value.trim();
+    const name = document.getElementById('f_name').value.trim();
+    const unit = document.getElementById('f_unit').value.trim();
+    const category = document.getElementById('f_category').value.trim();
+    const location = document.getElementById('f_location').value.trim();
+    const initialStock = Number(document.getElementById('f_initial').value||0);
+    const minStock = Number(document.getElementById('f_min').value||0);
+    if(!editing && itemByCode(code)){ showToast('Kode barang sudah dipakai.', true); return; }
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    try{
+      if(editing){
+        await dbUpdateItem(code, { name, unit, category, location, minStock });
+        Object.assign(editing, { name, unit, category, location, minStock });
+      } else {
+        const saved = await dbCreateItem({ code, name, unit, category, location, initialStock, minStock });
+        DB.items.push(saved);
+      }
+      showToast('Barang tersimpan.'); closeModal(); render();
+    }catch(err){ console.error(err); showToast('Gagal menyimpan barang ke database.', true); submitBtn.disabled = false; }
+  });
+}
+function confirmDeleteItem(code){
+  const item = itemByCode(code);
+  openModal(`
+    <h3>Hapus Barang?</h3>
+    <p style="font-size:13.5px;color:var(--ink-soft);">Barang <strong>${esc(item.name)}</strong> (${esc(code)}) beserta seluruh riwayat mutasinya akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelModal">Batal</button>
+      <button class="btn" style="background:var(--rust);color:#fff" id="confirmDel">Hapus</button>
+    </div>
+  `);
+  document.getElementById('cancelModal').addEventListener('click', closeModal);
+  document.getElementById('confirmDel').addEventListener('click', async ()=>{
+    try{
+      await dbDeleteItem(code); // cascades to transactions in the database
+      DB.items = DB.items.filter(i=>i.code!==code);
+      DB.trx = DB.trx.filter(t=>t.itemCode!==code);
+      showToast('Barang dihapus.'); closeModal(); render();
+    }catch(err){ console.error(err); showToast('Gagal menghapus barang.', true); }
+  });
+}
+
+/* =========================================================
+   TRANSAKSI (masuk / keluar)
+========================================================= */
+function viewTransaksi(type){
+  const isIn = type==='in';
+  const label = isIn ? 'Barang Masuk' : 'Barang Keluar';
+  const docLabel = isIn ? 'No. Dokumen / Supplier' : 'No. Dokumen / Tujuan';
+  return `
+    <div class="pagehead">
+      <div><h2>${label}</h2><p>Catat setiap ${isIn?'penerimaan':'pengeluaran'} barang agar kartu stok selalu akurat.</p></div>
+    </div>
+    <div class="grid" style="grid-template-columns:340px 1fr;align-items:start;">
+      <div class="card">
+        <div class="section-title"><span class="swatch" style="background:${isIn?'var(--green)':'var(--rust)'}"></span>Form ${label}</div>
+        <form id="trxForm">
+          <div class="field"><label>Tanggal</label><input type="date" id="t_date" value="${todayISO()}" required></div>
+          <div class="field"><label>Barang</label>
+            <select id="t_item" required><option value="">Pilih barang...</option>
+              ${DB.items.map(i=>`<option value="${esc(i.code)}">${esc(i.code)} — ${esc(i.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Qty</label><input type="number" id="t_qty" min="1" required></div>
+          <div class="field"><label>${docLabel}</label><input type="text" id="t_doc" placeholder="opsional"></div>
+          <div class="field"><label>Keterangan</label><textarea id="t_note" rows="2" placeholder="opsional"></textarea></div>
+          <button type="submit" class="btn ${isIn?'btn-primary':'btn'}" style="${isIn?'':'background:var(--rust);color:#fff'};width:100%;justify-content:center;">Simpan ${label}</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="section-title"><span class="swatch" style="background:${isIn?'var(--green)':'var(--rust)'}"></span>Riwayat ${label}</div>
+        <div class="toolbar"><input type="text" class="search-input" id="trxSearch" placeholder="Cari kode atau nama barang..."></div>
+        <div id="trxTableWrap"></div>
+      </div>
+    </div>
+  `;
+}
+function trxTable(type, filter){
+  const q = (filter||'').toLowerCase().trim();
+  let rows = DB.trx.filter(t=>t.type===type).sort((a,b)=> (b.date+b.createdAt) > (a.date+a.createdAt) ? 1 : -1);
+  if(q) rows = rows.filter(t=>{
+    const it = itemByCode(t.itemCode);
+    return t.itemCode.toLowerCase().includes(q) || (it && it.name.toLowerCase().includes(q));
+  });
+  if(!rows.length) return `<div class="empty">Belum ada transaksi.</div>`;
+  return `
+    <table><thead><tr><th>Tanggal</th><th>Kode</th><th>Nama Barang</th><th class="num">Qty</th><th>Dokumen</th><th>Keterangan</th><th></th></tr></thead>
+    <tbody>${rows.map(t=>{
+      const it = itemByCode(t.itemCode);
+      return `<tr>
+        <td>${fmtDate(t.date)}</td>
+        <td><span class="tag-code">${esc(t.itemCode)}</span></td>
+        <td>${it?esc(it.name):'<em>(dihapus)</em>'}</td>
+        <td class="num">${fmtNum(t.qty)}</td>
+        <td>${esc(t.doc)||'-'}</td>
+        <td>${esc(t.note)||'-'}</td>
+        <td><button class="btn-danger-text" data-deltrx="${t.id}">Hapus</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>
+  `;
+}
+function bindTransaksi(type){
+  const wrap = document.getElementById('trxTableWrap');
+  wrap.innerHTML = trxTable(type, '');
+  bindTrxRowActions(wrap, type);
+  document.getElementById('trxSearch').addEventListener('input', (e)=>{
+    wrap.innerHTML = trxTable(type, e.target.value);
+    bindTrxRowActions(wrap, type);
+  });
+  document.getElementById('trxForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    if(!DB.items.length){ showToast('Tambahkan barang di Master Barang terlebih dahulu.', true); return; }
+    const itemCode = document.getElementById('t_item').value;
+    const date = document.getElementById('t_date').value;
+    const qty = Number(document.getElementById('t_qty').value||0);
+    const doc = document.getElementById('t_doc').value.trim();
+    const note = document.getElementById('t_note').value.trim();
+    if(!itemCode){ showToast('Pilih barang terlebih dahulu.', true); return; }
+    if(qty<=0){ showToast('Qty harus lebih dari 0.', true); return; }
+    if(type==='out'){
+      const stock = currentStock(itemCode);
+      if(qty > stock){ showToast(`Stok tidak cukup. Stok saat ini: ${fmtNum(stock)}.`, true); return; }
+    }
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    try{
+      const saved = await dbCreateTrx({ itemCode, type, qty, date, doc, note });
+      DB.trx.push(saved);
+      showToast(`${type==='in'?'Barang masuk':'Barang keluar'} tersimpan.`);
+      render();
+    }catch(err){ console.error(err); showToast('Gagal menyimpan transaksi ke database.', true); submitBtn.disabled = false; }
+  });
+}
+function bindTrxRowActions(wrap, type){
+  wrap.querySelectorAll('[data-deltrx]').forEach(b=> b.addEventListener('click', async ()=>{
+    try{
+      await dbDeleteTrx(b.dataset.deltrx);
+      DB.trx = DB.trx.filter(t=>t.id!==b.dataset.deltrx);
+      showToast('Transaksi dihapus.'); render();
+    }catch(err){ console.error(err); showToast('Gagal menghapus transaksi.', true); }
+  }));
+}
+
+/* =========================================================
+   STOK OPNAME
+========================================================= */
+function viewOpname(){
+  const rows = DB.items.map(i=> ({ code:i.code, name:i.name, unit:i.unit, system: currentStock(i.code) }));
+  const history = [...DB.opname].sort((a,b)=> b.date>a.date?1:-1);
+  return `
+    <div class="pagehead">
+      <div><h2>Stok Opname</h2><p>Bandingkan stok fisik hasil hitung gudang dengan stok sistem, lalu simpan sebagai penyesuaian.</p></div>
+    </div>
+    ${!DB.items.length ? `<div class="empty">Tambahkan barang di Master Barang terlebih dahulu untuk melakukan opname.</div>` : `
+    <div class="card">
+      <div class="field" style="max-width:220px;"><label>Tanggal Opname</label><input type="date" id="opnameDate" value="${todayISO()}"></div>
+      <table><thead><tr>
+        <th>Kode</th><th>Nama Barang</th><th class="num">Stok Sistem</th><th class="num">Stok Fisik</th><th class="num">Selisih</th><th>Catatan</th>
+      </tr></thead>
+      <tbody id="opnameBody">
+        ${rows.map(r=>`
+          <tr data-code="${esc(r.code)}">
+            <td><span class="tag-code">${esc(r.code)}</span></td>
+            <td>${esc(r.name)}</td>
+            <td class="num">${fmtNum(r.system)} ${esc(r.unit)}</td>
+            <td class="num"><input type="number" class="opname-fisik" data-code="${esc(r.code)}" data-system="${r.system}" value="${r.system}" style="width:100px;text-align:right;"></td>
+            <td class="num diff-cell diff-zero" data-diffcell="${esc(r.code)}">0</td>
+            <td><input type="text" class="opname-note" data-code="${esc(r.code)}" placeholder="opsional"></td>
+          </tr>
+        `).join('')}
+      </tbody></table>
+      <div class="modal-actions" style="justify-content:flex-start;margin-top:16px;">
+        <button class="btn btn-amber" id="btnSaveOpname">Simpan &amp; Sesuaikan Stok</button>
+      </div>
+    </div>
+    `}
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><span class="swatch" style="background:var(--amber)"></span>Riwayat Opname</div>
+      ${history.length ? `
+        <table><thead><tr><th>Tanggal</th><th class="num">Item Diperiksa</th><th class="num">Item Selisih</th><th>Catatan</th></tr></thead>
+        <tbody>${history.map(h=>`
+          <tr><td>${fmtDate(h.date)}</td><td class="num">${fmtNum(h.entries.length)}</td>
+          <td class="num">${fmtNum(h.entries.filter(e=>e.diff!==0).length)}</td><td>${esc(h.note)||'-'}</td></tr>
+        `).join('')}</tbody></table>
+      ` : `<div class="empty">Belum ada riwayat opname.</div>`}
+    </div>
+  `;
+}
+function bindOpname(){
+  if(!DB.items.length) return;
+  const recalc = (input)=>{
+    const code = input.dataset.code;
+    const system = Number(input.dataset.system);
+    const fisik = Number(input.value||0);
+    const diff = fisik - system;
+    const cell = document.querySelector(`[data-diffcell="${CSS.escape(code)}"]`);
+    cell.textContent = (diff>0?'+':'') + fmtNum(diff);
+    cell.className = 'num diff-cell ' + (diff>0?'diff-pos':diff<0?'diff-neg':'diff-zero');
+  };
+  document.querySelectorAll('.opname-fisik').forEach(inp=> inp.addEventListener('input', ()=>recalc(inp)));
+  document.getElementById('btnSaveOpname').addEventListener('click', async ()=>{
+    const date = document.getElementById('opnameDate').value || todayISO();
+    const entries = [];
+    document.querySelectorAll('.opname-fisik').forEach(inp=>{
+      const code = inp.dataset.code;
+      const system = Number(inp.dataset.system);
+      const physical = Number(inp.value||0);
+      const note = document.querySelector(`.opname-note[data-code="${CSS.escape(code)}"]`).value.trim();
+      entries.push({ itemCode: code, systemQty: system, physicalQty: physical, diff: physical-system, note });
+    });
+    const changed = entries.filter(e=>e.diff!==0);
+    const btn = document.getElementById('btnSaveOpname');
+    btn.disabled = true;
+    try{
+      const opnameId = await dbCreateOpname(date, entries, `${changed.length} item disesuaikan`);
+      for(const e of changed){
+        const saved = await dbCreateTrx({
+          itemCode: e.itemCode,
+          type: e.diff>0 ? 'in' : 'out',
+          qty: Math.abs(e.diff),
+          date,
+          doc: 'OPNAME',
+          note: `Penyesuaian Opname ${fmtDate(date)}${e.note?' — '+e.note:''}`
+        });
+        DB.trx.push(saved);
+      }
+      DB.opname.push({ id: opnameId, date, entries, note:`${changed.length} item disesuaikan` });
+      showToast(`Opname disimpan. ${changed.length} item disesuaikan.`);
+      render();
+    }catch(err){ console.error(err); showToast('Gagal menyimpan hasil opname.', true); btn.disabled = false; }
+  });
+}
+
+/* =========================================================
+   KARTU STOK
+========================================================= */
+function itemSummary(code, from, to){
+  const item = itemByCode(code);
+  let running = Number(item.initialStock||0);
+  let saldoAwal = running;
+  let totalMasuk = 0, totalKeluar = 0;
+  trxForItem(code).forEach(t=>{
+    const before = from && t.date < from;
+    const after = to && t.date > to;
+    if(before){
+      running += t.type==='in' ? Number(t.qty) : -Number(t.qty);
+      saldoAwal = running;
+      return;
+    }
+    if(after) return; // ignore mutations after the period entirely
+    running += t.type==='in' ? Number(t.qty) : -Number(t.qty);
+    if(t.type==='in') totalMasuk += Number(t.qty); else totalKeluar += Number(t.qty);
+  });
+  const saldoAkhir = saldoAwal + totalMasuk - totalKeluar;
+  return { code:item.code, name:item.name, unit:item.unit, location:item.location, minStock:item.minStock,
+           saldoAwal, totalMasuk, totalKeluar, saldoAkhir, selisih: totalMasuk - totalKeluar };
+}
+function viewKartu(){
+  if(!kartuSelectedCode && DB.items.length) kartuSelectedCode = DB.items[0].code;
+  return `
+    <div class="pagehead">
+      <div><h2>Kartu Stok</h2><p>Rekap semua barang lengkap dengan total masuk, keluar dan selisih, plus detail mutasi per barang siap cetak.</p></div>
+    </div>
+    ${!DB.items.length ? `<div class="empty">Tambahkan barang di Master Barang untuk melihat kartu stoknya.</div>` : `
+    <div class="card">
+      <div class="section-title"><span class="swatch" style="background:var(--navy)"></span>Rekap Semua Barang</div>
+      <div class="toolbar">
+        <input type="text" class="search-input" id="rekapSearch" placeholder="Cari kode atau nama barang...">
+        <div><label>Dari Tanggal</label><input type="date" id="rekapFrom"></div>
+        <div><label>Sampai Tanggal</label><input type="date" id="rekapTo" value="${todayISO()}"></div>
+        <button class="btn btn-ghost" id="btnCetakRekap" style="align-self:flex-end;">${ICONS.printer} Cetak Rekap Semua</button>
+      </div>
+      <div id="rekapTableWrap"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><span class="swatch" style="background:var(--amber)"></span>Detail Mutasi per Barang</div>
+      <div class="toolbar">
+        <div style="flex:1;max-width:340px;">
+          <label>Pilih Barang</label>
+          <select id="kartuItemSelect" class="item-select">
+            ${DB.items.map(i=>`<option value="${esc(i.code)}" ${i.code===kartuSelectedCode?'selected':''}>${esc(i.code)} — ${esc(i.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label>Dari Tanggal</label>
+          <input type="date" id="kartuFrom">
+        </div>
+        <div>
+          <label>Sampai Tanggal</label>
+          <input type="date" id="kartuTo" value="${todayISO()}">
+        </div>
+        <button class="btn btn-amber" id="btnCetakKartu" style="align-self:flex-end;">${ICONS.printer} Cetak Kartu Stok</button>
+      </div>
+      <div id="kartuDetailWrap"></div>
+    </div>
+    `}
+  `;
+}
+function rekapTableHTML(filter, from, to){
+  const q = (filter||'').toLowerCase().trim();
+  let rows = DB.items.map(i=> itemSummary(i.code, from, to));
+  if(q) rows = rows.filter(r=> r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+  if(!rows.length) return `<div class="empty">Tidak ada barang yang cocok.</div>`;
+  const totalMasuk = rows.reduce((s,r)=>s+r.totalMasuk,0);
+  const totalKeluar = rows.reduce((s,r)=>s+r.totalKeluar,0);
+  return `
+    <table><thead><tr>
+      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th><th class="num">Selisih</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`
+      <tr>
+        <td><span class="tag-code">${esc(r.code)}</span></td>
+        <td>${esc(r.name)}</td>
+        <td class="num">${fmtNum(r.saldoAwal)} ${esc(r.unit)}</td>
+        <td class="num" style="color:var(--green)">${r.totalMasuk?'+'+fmtNum(r.totalMasuk):'0'}</td>
+        <td class="num" style="color:var(--rust)">${r.totalKeluar?'-'+fmtNum(r.totalKeluar):'0'}</td>
+        <td class="num" style="font-weight:600;${r.saldoAkhir<=Number(r.minStock||0)?'color:var(--rust)':''}">${fmtNum(r.saldoAkhir)}</td>
+        <td class="num ${r.selisih>0?'diff-pos':r.selisih<0?'diff-neg':'diff-zero'}">${r.selisih>0?'+':''}${fmtNum(r.selisih)}</td>
+      </tr>
+    `).join('')}</tbody></table>
+    <div style="display:flex;gap:22px;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--ink-soft);">
+      <div>Total Masuk: <strong style="color:var(--green)">+${fmtNum(totalMasuk)}</strong></div>
+      <div>Total Keluar: <strong style="color:var(--rust)">-${fmtNum(totalKeluar)}</strong></div>
+      <div>Selisih Bersih: <strong>${totalMasuk-totalKeluar>0?'+':''}${fmtNum(totalMasuk-totalKeluar)}</strong></div>
+    </div>
+  `;
+}
+function buildKartuRows(code, from, to){
+  const item = itemByCode(code);
+  let running = Number(item.initialStock||0);
+  const all = trxForItem(code);
+  const rowsAll = [{ date:null, label:'Saldo Awal', masuk:null, keluar:null, saldo:running, note:'' }];
+  all.forEach(t=>{
+    if(t.type==='in') running += Number(t.qty); else running -= Number(t.qty);
+    rowsAll.push({
+      date:t.date,
+      label: t.doc||(t.type==='in'?'Penerimaan':'Pengeluaran'),
+      masuk: t.type==='in'?t.qty:null,
+      keluar: t.type==='out'?t.qty:null,
+      saldo: running,
+      note: t.note||''
+    });
+  });
+  const filtered = rowsAll.filter(r=>{
+    if(!r.date) return true;
+    if(from && r.date < from) return false;
+    if(to && r.date > to) return false;
+    return true;
+  });
+  return filtered;
+}
+function kartuDetailHTML(code, from, to){
+  const item = itemByCode(code);
+  const rows = buildKartuRows(code, from, to);
+  return `
+    <div class="grid cols-4" style="margin:16px 0;">
+      <div class="stat"><div class="label">Kode</div><div class="value" style="font-size:18px;">${esc(item.code)}</div></div>
+      <div class="stat"><div class="label">Satuan</div><div class="value" style="font-size:18px;">${esc(item.unit)}</div></div>
+      <div class="stat"><div class="label">Lokasi</div><div class="value" style="font-size:18px;">${esc(item.location)||'-'}</div></div>
+      <div class="stat"><div class="label">Stok Saat Ini</div><div class="value" style="font-size:18px;">${fmtNum(currentStock(code))}</div></div>
+    </div>
+    <table><thead><tr><th>Tanggal</th><th>Keterangan</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo</th></tr></thead>
+    <tbody>${rows.map(r=>`
+      <tr><td>${r.date?fmtDate(r.date):'-'}</td><td>${esc(r.label)}${r.note?` <span style="color:var(--ink-soft)">— ${esc(r.note)}</span>`:''}</td>
+      <td class="num" style="color:var(--green)">${r.masuk!=null?fmtNum(r.masuk):''}</td>
+      <td class="num" style="color:var(--rust)">${r.keluar!=null?fmtNum(r.keluar):''}</td>
+      <td class="num" style="font-weight:600;">${fmtNum(r.saldo)}</td></tr>
+    `).join('')}</tbody></table>
+  `;
+}
+function bindKartu(){
+  if(!DB.items.length) return;
+
+  // rekap semua barang
+  const refreshRekap = ()=>{
+    const filter = document.getElementById('rekapSearch').value;
+    const from = document.getElementById('rekapFrom').value;
+    const to = document.getElementById('rekapTo').value;
+    document.getElementById('rekapTableWrap').innerHTML = rekapTableHTML(filter, from, to);
+  };
+  refreshRekap();
+  document.getElementById('rekapSearch').addEventListener('input', refreshRekap);
+  document.getElementById('rekapFrom').addEventListener('change', refreshRekap);
+  document.getElementById('rekapTo').addEventListener('change', refreshRekap);
+  document.getElementById('btnCetakRekap').addEventListener('click', ()=>{
+    const from = document.getElementById('rekapFrom').value;
+    const to = document.getElementById('rekapTo').value;
+    printKartuRekap(from, to);
+  });
+
+  // detail per barang
+  const refresh = ()=>{
+    const from = document.getElementById('kartuFrom').value;
+    const to = document.getElementById('kartuTo').value;
+    document.getElementById('kartuDetailWrap').innerHTML = kartuDetailHTML(kartuSelectedCode, from, to);
+  };
+  document.getElementById('kartuDetailWrap').innerHTML = kartuDetailHTML(kartuSelectedCode, '', document.getElementById('kartuTo').value);
+  document.getElementById('kartuItemSelect').addEventListener('change', (e)=>{ kartuSelectedCode = e.target.value; refresh(); });
+  document.getElementById('kartuFrom').addEventListener('change', refresh);
+  document.getElementById('kartuTo').addEventListener('change', refresh);
+  document.getElementById('btnCetakKartu').addEventListener('click', ()=>{
+    const from = document.getElementById('kartuFrom').value;
+    const to = document.getElementById('kartuTo').value;
+    printKartu(kartuSelectedCode, from, to);
+  });
+}
+function printKartuRekap(from, to){
+  const rows = DB.items.map(i=> itemSummary(i.code, from, to));
+  const totalMasuk = rows.reduce((s,r)=>s+r.totalMasuk,0);
+  const totalKeluar = rows.reduce((s,r)=>s+r.totalKeluar,0);
+  const html = `
+    <div class="kartu-print-head">
+      <div class="co">${esc(DB.settings.company||'Nama Perusahaan')}</div>
+      <div class="addr">${esc(DB.settings.address||'')}</div>
+    </div>
+    <div class="kartu-print-title">Rekap Kartu Stok — Semua Barang</div>
+    <div class="kartu-meta">
+      <div><span class="k">Periode</span>: ${from?fmtDate(from):'Awal'} s/d ${to?fmtDate(to):'sekarang'}</div>
+      <div><span class="k">Dicetak</span>: ${fmtDate(todayISO())}</div>
+      <div><span class="k">Jumlah Barang</span>: ${fmtNum(rows.length)}</div>
+    </div>
+    <table><thead><tr>
+      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th><th class="num">Selisih</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`
+      <tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td>
+      <td class="num">${fmtNum(r.saldoAwal)} ${esc(r.unit)}</td>
+      <td class="num">${r.totalMasuk?'+'+fmtNum(r.totalMasuk):'0'}</td>
+      <td class="num">${r.totalKeluar?'-'+fmtNum(r.totalKeluar):'0'}</td>
+      <td class="num">${fmtNum(r.saldoAkhir)}</td>
+      <td class="num">${r.selisih>0?'+':''}${fmtNum(r.selisih)}</td></tr>
+    `).join('')}</tbody>
+    <tfoot><tr style="font-weight:700;"><td colspan="3">Total</td>
+      <td class="num">+${fmtNum(totalMasuk)}</td><td class="num">-${fmtNum(totalKeluar)}</td><td></td>
+      <td class="num">${totalMasuk-totalKeluar>0?'+':''}${fmtNum(totalMasuk-totalKeluar)}</td></tr></tfoot>
+    </table>
+    <div class="sig">
+      <div><div class="line">Diperiksa oleh</div></div>
+      <div><div class="line">Dibuat oleh</div></div>
+    </div>
+  `;
+  document.getElementById('printArea').innerHTML = html;
+  window.print();
+}
+function printKartu(code, from, to){
+  const item = itemByCode(code);
+  const rows = buildKartuRows(code, from, to);
+  const html = `
+    <div class="kartu-print-head">
+      <div class="co">${esc(DB.settings.company||'Nama Perusahaan')}</div>
+      <div class="addr">${esc(DB.settings.address||'')}</div>
+    </div>
+    <div class="kartu-print-title">Kartu Stok</div>
+    <div class="kartu-meta">
+      <div><span class="k">Kode Barang</span>: ${esc(item.code)}</div>
+      <div><span class="k">Satuan</span>: ${esc(item.unit)}</div>
+      <div><span class="k">Nama Barang</span>: ${esc(item.name)}</div>
+      <div><span class="k">Lokasi</span>: ${esc(item.location)||'-'}</div>
+      <div><span class="k">Periode</span>: ${from?fmtDate(from):'Awal'} s/d ${to?fmtDate(to):'sekarang'}</div>
+      <div><span class="k">Dicetak</span>: ${fmtDate(todayISO())}</div>
+    </div>
+    <table><thead><tr><th>Tanggal</th><th>Keterangan</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo</th></tr></thead>
+    <tbody>${rows.map(r=>`
+      <tr><td>${r.date?fmtDate(r.date):'-'}</td><td>${esc(r.label)}${r.note?' — '+esc(r.note):''}</td>
+      <td class="num">${r.masuk!=null?fmtNum(r.masuk):''}</td>
+      <td class="num">${r.keluar!=null?fmtNum(r.keluar):''}</td>
+      <td class="num">${fmtNum(r.saldo)}</td></tr>
+    `).join('')}</tbody></table>
+    <div class="sig">
+      <div><div class="line">Diperiksa oleh</div></div>
+      <div><div class="line">Dibuat oleh</div></div>
+    </div>
+  `;
+  document.getElementById('printArea').innerHTML = html;
+  window.print();
+}
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+function viewSettings(){
+  return `
+    <div class="pagehead"><div><h2>Pengaturan</h2><p>Informasi ini muncul sebagai kop pada cetakan kartu stok.</p></div></div>
+    <div class="card" style="max-width:480px;">
+      <form id="settingsForm">
+        <div class="field"><label>Nama Perusahaan / Gudang</label><input type="text" id="s_company" value="${esc(DB.settings.company)}"></div>
+        <div class="field"><label>Alamat</label><textarea id="s_address" rows="2">${esc(DB.settings.address)}</textarea></div>
+        <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
+      </form>
+    </div>
+  `;
+}
+function bindSettings(){
+  document.getElementById('settingsForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const company = document.getElementById('s_company').value.trim() || 'Nama Perusahaan';
+    const address = document.getElementById('s_address').value.trim();
+    try{
+      await dbSaveSettings({ company, address });
+      DB.settings.company = company;
+      DB.settings.address = address;
+      showToast('Pengaturan tersimpan.'); render();
+    }catch(err){ console.error(err); showToast('Gagal menyimpan pengaturan.', true); }
+  });
+}
+
+/* =========================================================
+   RESET
+========================================================= */
+document.getElementById('resetDataBtn').addEventListener('click', ()=>{
+  openModal(`
+    <h3>Hapus Semua Data?</h3>
+    <p style="font-size:13.5px;color:var(--ink-soft);">Seluruh data barang, transaksi, dan riwayat opname akan dihapus permanen dari penyimpanan. Tindakan ini tidak bisa dibatalkan.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelModal">Batal</button>
+      <button class="btn" style="background:var(--rust);color:#fff" id="confirmReset">Hapus Semua</button>
+    </div>
+  `);
+  document.getElementById('cancelModal').addEventListener('click', closeModal);
+  document.getElementById('confirmReset').addEventListener('click', async ()=>{
+    try{
+      await dbResetAll();
+      DB = { items:[], trx:[], opname:[], settings:{ company:'Nama Perusahaan Anda', address:'' } };
+      closeModal();
+      currentRoute='dashboard';
+      showToast('Semua data telah dihapus.');
+      render();
+    }catch(err){ console.error(err); showToast('Gagal menghapus data.', true); closeModal(); }
+  });
+});
+
+/* =========================================================
+   INIT
+========================================================= */
+(async function init(){
+  document.getElementById('mainContent').innerHTML = `<div class="empty" style="margin-top:60px;">Menghubungkan ke database Supabase...</div>`;
+  try{
+    await loadAll();
+    render();
+  }catch(err){
+    console.error(err);
+    document.getElementById('mainContent').innerHTML = `<div class="empty" style="margin-top:60px;">Gagal terhubung ke database. Periksa koneksi internet Anda, lalu muat ulang halaman.</div>`;
+  }
+})();
+</script>
+</body>
+</html>
