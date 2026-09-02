@@ -759,6 +759,7 @@ function viewOpname(){
       </tbody></table>
       <div class="modal-actions" style="justify-content:flex-start;margin-top:16px;">
         <button class="btn btn-amber" id="btnSaveOpname">Simpan &amp; Sesuaikan Stok</button>
+        <button class="btn btn-ghost" id="btnPrintOpname">${ICONS.printer} Print Data Opname</button>
       </div>
     </div>
     `}
@@ -787,6 +788,9 @@ function bindOpname(){
     cell.className = 'num diff-cell ' + (diff>0?'diff-pos':diff<0?'diff-neg':'diff-zero');
   };
   document.querySelectorAll('.opname-fisik').forEach(inp=> inp.addEventListener('input', ()=>recalc(inp)));
+  document.getElementById('btnPrintOpname').addEventListener('click', ()=>{
+    printOpname(document.getElementById('opnameDate').value || todayISO());
+  });
   document.getElementById('btnSaveOpname').addEventListener('click', async ()=>{
     const date = document.getElementById('opnameDate').value || todayISO();
     const entries = [];
@@ -818,6 +822,47 @@ function bindOpname(){
       render();
     }catch(err){ console.error(err); showToast('Gagal menyimpan hasil opname.', true); btn.disabled = false; }
   });
+}
+function printOpname(date){
+  const rows = DB.items.map(item=>{
+    const physicalInput = document.querySelector(`.opname-fisik[data-code="${CSS.escape(item.code)}"]`);
+    const noteInput = document.querySelector(`.opname-note[data-code="${CSS.escape(item.code)}"]`);
+    const system = Number(physicalInput.dataset.system);
+    const physical = Number(physicalInput.value||0);
+    return { code:item.code, name:item.name, unit:item.unit, system, physical, diff:physical-system, note:noteInput.value.trim() };
+  });
+  const changed = rows.filter(row=>row.diff!==0).length;
+  const html = `
+    <div class="kartu-print-head">
+      <div class="co">${esc(DB.settings.company||'Nama Perusahaan')}</div>
+      <div class="addr">${esc(DB.settings.address||'')}</div>
+    </div>
+    <div class="kartu-print-title">Data Stok Opname</div>
+    <div class="kartu-meta">
+      <div><span class="k">Tanggal Opname</span>: ${fmtDate(date)}</div>
+      <div><span class="k">Dicetak</span>: ${fmtDate(todayISO())}</div>
+      <div><span class="k">Item Diperiksa</span>: ${fmtNum(rows.length)}</div>
+      <div><span class="k">Item Selisih</span>: ${fmtNum(changed)}</div>
+    </div>
+    <table><thead><tr>
+      <th>Kode</th><th>Nama Barang</th><th class="num">Stok Sistem</th><th class="num">Stok Fisik</th><th class="num">Selisih</th><th>Catatan</th>
+    </tr></thead>
+    <tbody>${rows.map(row=>`
+      <tr>
+        <td>${esc(row.code)}</td><td>${esc(row.name)}</td>
+        <td class="num">${fmtNum(row.system)} ${esc(row.unit)}</td>
+        <td class="num">${fmtNum(row.physical)} ${esc(row.unit)}</td>
+        <td class="num">${row.diff>0?'+':''}${fmtNum(row.diff)}</td>
+        <td>${esc(row.note)||'-'}</td>
+      </tr>
+    `).join('')}</tbody></table>
+    <div class="sig">
+      <div><div class="line">Diperiksa oleh</div></div>
+      <div><div class="line">Dibuat oleh</div></div>
+    </div>
+  `;
+  document.getElementById('printArea').innerHTML = html;
+  window.print();
 }
 
 /* =========================================================
