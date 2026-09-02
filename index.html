@@ -896,7 +896,7 @@ function viewKartu(){
   if(!kartuSelectedCode && DB.items.length) kartuSelectedCode = DB.items[0].code;
   return `
     <div class="pagehead">
-      <div><h2>Kartu Stok</h2><p>Rekap semua barang lengkap dengan total masuk, keluar dan selisih, plus detail mutasi per barang siap cetak.</p></div>
+      <div><h2>Kartu Stok</h2><p>Rekap semua barang lengkap dengan total masuk, keluar dan saldo akhir, plus detail mutasi per barang siap cetak.</p></div>
     </div>
     ${!DB.items.length ? `<div class="empty">Tambahkan barang di Master Barang untuk melihat kartu stoknya.</div>` : `
     <div class="card">
@@ -943,7 +943,7 @@ function rekapTableHTML(filter, from, to){
   const totalKeluar = rows.reduce((s,r)=>s+r.totalKeluar,0);
   return `
     <table><thead><tr>
-      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th><th class="num">Selisih</th>
+      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th>
     </tr></thead>
     <tbody>${rows.map(r=>`
       <tr>
@@ -953,13 +953,11 @@ function rekapTableHTML(filter, from, to){
         <td class="num" style="color:var(--green)">${r.totalMasuk?'+'+fmtNum(r.totalMasuk):'0'}</td>
         <td class="num" style="color:var(--rust)">${r.totalKeluar?'-'+fmtNum(r.totalKeluar):'0'}</td>
         <td class="num" style="font-weight:600;${r.saldoAkhir<=Number(r.minStock||0)?'color:var(--rust)':''}">${fmtNum(r.saldoAkhir)}</td>
-        <td class="num ${r.selisih>0?'diff-pos':r.selisih<0?'diff-neg':'diff-zero'}">${r.selisih>0?'+':''}${fmtNum(r.selisih)}</td>
       </tr>
     `).join('')}</tbody></table>
     <div style="display:flex;gap:22px;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--ink-soft);">
       <div>Total Masuk: <strong style="color:var(--green)">+${fmtNum(totalMasuk)}</strong></div>
       <div>Total Keluar: <strong style="color:var(--rust)">-${fmtNum(totalKeluar)}</strong></div>
-      <div>Selisih Bersih: <strong>${totalMasuk-totalKeluar>0?'+':''}${fmtNum(totalMasuk-totalKeluar)}</strong></div>
     </div>
   `;
 }
@@ -1058,19 +1056,17 @@ function printKartuRekap(from, to){
       <div><span class="k">Jumlah Barang</span>: ${fmtNum(rows.length)}</div>
     </div>
     <table><thead><tr>
-      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th><th class="num">Selisih</th>
+      <th>Kode</th><th>Nama Barang</th><th class="num">Saldo Awal</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Saldo Akhir</th>
     </tr></thead>
     <tbody>${rows.map(r=>`
       <tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td>
       <td class="num">${fmtNum(r.saldoAwal)} ${esc(r.unit)}</td>
       <td class="num">${r.totalMasuk?'+'+fmtNum(r.totalMasuk):'0'}</td>
       <td class="num">${r.totalKeluar?'-'+fmtNum(r.totalKeluar):'0'}</td>
-      <td class="num">${fmtNum(r.saldoAkhir)}</td>
-      <td class="num">${r.selisih>0?'+':''}${fmtNum(r.selisih)}</td></tr>
+      <td class="num">${fmtNum(r.saldoAkhir)}</td></tr>
     `).join('')}</tbody>
     <tfoot><tr style="font-weight:700;"><td colspan="3">Total</td>
-      <td class="num">+${fmtNum(totalMasuk)}</td><td class="num">-${fmtNum(totalKeluar)}</td><td></td>
-      <td class="num">${totalMasuk-totalKeluar>0?'+':''}${fmtNum(totalMasuk-totalKeluar)}</td></tr></tfoot>
+      <td class="num">+${fmtNum(totalMasuk)}</td><td class="num">-${fmtNum(totalKeluar)}</td><td></td></tr></tfoot>
     </table>
     <div class="sig">
       <div><div class="line">Diperiksa oleh</div></div>
