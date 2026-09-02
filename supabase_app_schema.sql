@@ -1,7 +1,8 @@
 -- Schema for the current Kartu Gudang frontend.
 -- Run this once in the Supabase SQL editor.
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.app_users (
   username text primary key,
@@ -10,7 +11,7 @@ create table if not exists public.app_users (
 );
 
 insert into public.app_users (username, password_hash)
-values ('adminsppgklampitan', crypt('admin123', gen_salt('bf')))
+values ('adminsppgklampitan', extensions.crypt('admin123', extensions.gen_salt('bf')))
 on conflict (username) do nothing;
 
 create or replace function public.authenticate_app_user(p_username text, p_password text)
@@ -22,7 +23,7 @@ as $$
   select exists (
     select 1 from public.app_users
     where username = lower(trim(p_username))
-      and password_hash = crypt(p_password, password_hash)
+      and password_hash = extensions.crypt(p_password, password_hash)
   );
 $$;
 
