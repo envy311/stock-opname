@@ -3,6 +3,32 @@
 
 create extension if not exists pgcrypto;
 
+create table if not exists public.app_users (
+  username text primary key,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
+insert into public.app_users (username, password_hash)
+values ('adminsppgklampitan', crypt('admin123', gen_salt('bf')))
+on conflict (username) do nothing;
+
+create or replace function public.authenticate_app_user(p_username text, p_password text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.app_users
+    where username = lower(trim(p_username))
+      and password_hash = crypt(p_password, password_hash)
+  );
+$$;
+
+revoke all on public.app_users from anon, authenticated;
+grant execute on function public.authenticate_app_user(text, text) to anon, authenticated;
+
 create table if not exists public.items (
   code text primary key,
   name text not null,

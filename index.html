@@ -221,6 +221,13 @@
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
   .toolbar input,.toolbar select{width:auto;}
   .search-input{min-width:220px;}
+  #loginRoot{min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);padding:20px;}
+  .login-card{width:100%;max-width:410px;background:#fff;border:1px solid #DBEAFE;border-radius:16px;padding:34px;box-shadow:0 18px 45px rgba(30,64,175,.14);}
+  .login-card .stamp{display:inline-block;color:var(--navy);background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:5px 9px;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.05em;}
+  .login-card h1{font-size:27px;margin:18px 0 6px;}
+  .login-card p{color:var(--ink-soft);font-size:13px;margin:0 0 24px;}
+  .login-card .btn{width:100%;justify-content:center;margin-top:8px;}
+  #loginError{color:var(--rust);font-size:12.5px;min-height:19px;margin-top:10px;}
 
   /* ---------- print ---------- */
   #printArea{display:none;}
@@ -246,7 +253,19 @@
 </head>
 <body>
 
-<div id="app">
+<div id="loginRoot">
+  <form class="login-card" id="loginForm">
+    <span class="stamp">GUDANG · MUTASI STOK</span>
+    <h1>Selamat datang</h1>
+    <p>Masuk untuk mengelola data stok gudang Anda.</p>
+    <div class="field"><label for="loginUsername">Username</label><input type="text" id="loginUsername" autocomplete="username" required></div>
+    <div class="field"><label for="loginPassword">Password</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
+    <button class="btn btn-primary" type="submit" id="loginButton">Masuk ke Aplikasi</button>
+    <div id="loginError" role="alert"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
   <aside class="sidebar">
     <div class="brand">
       <span class="stamp">GUDANG · MUTASI STOK</span>
@@ -256,6 +275,7 @@
     <nav class="navlist" id="navlist"></nav>
     <div class="sidebar-foot">
       <button id="resetDataBtn">Hapus semua data</button>
+      <button id="logoutBtn">Keluar</button>
     </div>
   </aside>
 
@@ -290,6 +310,20 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let DB = { items: [], trx: [], opname: [], settings: { company:'Nama Perusahaan Anda', address:'' } };
+
+async function authenticate(username, password){
+  const { data, error } = await sb.rpc('authenticate_app_user', { p_username:username, p_password:password });
+  if(error) throw error;
+  return data === true || (Array.isArray(data) && data[0] === true);
+}
+function showApp(){
+  document.getElementById('loginRoot').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+}
+function showLogin(){
+  document.getElementById('loginRoot').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
 
 function mapItemRow(r){ return { code:r.code, name:r.name, category:r.category||'', unit:r.unit, location:r.location||'', initialStock:Number(r.initial_stock), minStock:Number(r.min_stock) }; }
 function mapTrxRow(r){ return { id:r.id, itemCode:r.item_code, type:r.type, qty:Number(r.qty), date:r.date, doc:r.doc||'', note:r.note||'', createdAt:r.created_at }; }
@@ -1163,10 +1197,39 @@ document.getElementById('resetDataBtn').addEventListener('click', ()=>{
   });
 });
 
+document.getElementById('loginForm').addEventListener('submit', async (event)=>{
+  event.preventDefault();
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const button = document.getElementById('loginButton');
+  const error = document.getElementById('loginError');
+  button.disabled = true;
+  error.textContent = '';
+  try{
+    if(!await authenticate(username, password)) throw new Error('invalid credentials');
+    sessionStorage.setItem('stock_opname_logged_in', 'true');
+    showApp();
+    await loadAll();
+    render();
+  }catch(err){
+    console.error(err);
+    error.textContent = 'Username atau password salah.';
+  }finally{
+    button.disabled = false;
+  }
+});
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  sessionStorage.removeItem('stock_opname_logged_in');
+  showLogin();
+  document.getElementById('loginPassword').value = '';
+});
+
 /* =========================================================
    INIT
 ========================================================= */
 (async function init(){
+  if(sessionStorage.getItem('stock_opname_logged_in') !== 'true') return;
+  showApp();
   document.getElementById('mainContent').innerHTML = `<div class="empty" style="margin-top:60px;">Menghubungkan ke database Supabase...</div>`;
   try{
     await loadAll();
