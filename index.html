@@ -249,6 +249,19 @@
   #printArea tfoot td{border-top:1.5px solid #111;padding-top:6px;}
   #printArea .sig{display:grid;grid-template-columns:1fr 1fr;margin-top:40px;font-size:12px;text-align:center;}
   #printArea .sig .line{margin-top:50px;border-top:1px solid #111;padding-top:4px;}
+  #printArea .pengambilan-print-page{break-after:page;page-break-after:always;}
+  #printArea .pengambilan-print-page:last-child{break-after:auto;page-break-after:auto;}
+  #printArea .pengambilan-print-page table{table-layout:fixed;}
+  #printArea .pengambilan-print-page th:nth-child(1){width:4%;}
+  #printArea .pengambilan-print-page th:nth-child(2){width:10%;}
+  #printArea .pengambilan-print-page th:nth-child(3){width:20%;}
+  #printArea .pengambilan-print-page th:nth-child(4){width:9%;}
+  #printArea .pengambilan-print-page th:nth-child(5){width:12%;}
+  #printArea .pengambilan-print-page th:nth-child(6){width:11%;}
+  #printArea .pengambilan-print-page th:nth-child(7){width:14%;}
+  #printArea .pengambilan-print-page th:nth-child(8){width:20%;}
+  #printArea .manual-cell{height:27px;}
+  #printArea .pengambilan-print-page .sig{grid-template-columns:1fr 1fr 1fr;}
 </style>
 </head>
 <body>
@@ -436,6 +449,7 @@ const ROUTES = [
   { id:'master', label:'Master Barang', icon:ICONS.master },
   { id:'masuk', label:'Barang Masuk', icon:ICONS.masuk },
   { id:'keluar', label:'Barang Keluar', icon:ICONS.keluar },
+  { id:'pengambilan', label:'Form Pengambilan', icon:ICONS.keluar },
   { id:'opname', label:'Stok Opname', icon:ICONS.opname },
   { id:'kartu', label:'Kartu Stok', icon:ICONS.kartu },
   { id:'settings', label:'Pengaturan', icon:ICONS.settings },
@@ -462,6 +476,7 @@ function render(){
     case 'master': main.innerHTML = viewMaster(); bindMaster(); break;
     case 'masuk': main.innerHTML = viewTransaksi('in'); bindTransaksi('in'); break;
     case 'keluar': main.innerHTML = viewTransaksi('out'); bindTransaksi('out'); break;
+    case 'pengambilan': main.innerHTML = viewPengambilan(); bindPengambilan(); break;
     case 'opname': main.innerHTML = viewOpname(); bindOpname(); break;
     case 'kartu': main.innerHTML = viewKartu(); bindKartu(); break;
     case 'settings': main.innerHTML = viewSettings(); bindSettings(); break;
@@ -764,6 +779,81 @@ function bindTrxRowActions(wrap, type){
       showToast('Transaksi dihapus.'); render();
     }catch(err){ console.error(err); showToast('Gagal menghapus transaksi.', true); }
   }));
+}
+
+/* =========================================================
+   FORM PENGAMBILAN BARANG (CETAK, LALU DIISI MANUAL)
+========================================================= */
+function viewPengambilan(){
+  return `
+    <div class="pagehead">
+      <div><h2>Form Pengambilan Barang</h2><p>Pilih tanggal, lalu cetak lembar kosong untuk ditulis manual menggunakan bolpoin.</p></div>
+    </div>
+    ${!DB.items.length ? `<div class="empty">Tambahkan barang di Master Barang terlebih dahulu untuk mencetak form pengambilan.</div>` : `
+    <div class="card" style="max-width:720px;">
+      <div class="field-row">
+        <div class="field"><label>Tanggal Pengambilan</label><input type="date" id="pengambilanDate" value="${todayISO()}"></div>
+        <div class="field"><label>Jumlah Form yang Dicetak</label><input type="number" id="pengambilanCopies" min="1" max="50" value="1"></div>
+      </div>
+      <div class="card" style="margin:4px 0 16px;padding:12px 14px;background:rgba(59,110,82,.05);">
+        <strong>Yang tampil di kartu:</strong> semua barang, stok saat ini, satuan, lokasi, serta kolom kosong untuk jumlah yang diambil dan keterangan.
+      </div>
+      <button class="btn btn-primary" id="btnPrintPengambilan">${ICONS.printer} Cetak Form Pengambilan</button>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><span class="swatch" style="background:var(--navy)"></span>Pratinjau Barang dan Stok Saat Ini</div>
+      <table><thead><tr><th>Kode</th><th>Nama Barang</th><th>Satuan</th><th>Lokasi</th><th class="num">Stok Saat Ini</th></tr></thead>
+      <tbody>${DB.items.map(item=>`
+        <tr><td><span class="tag-code">${esc(item.code)}</span></td><td>${esc(item.name)}</td>
+        <td>${esc(item.unit||'-')}</td><td>${esc(item.location||'-')}</td>
+        <td class="num">${fmtNum(currentStock(item.code))}</td></tr>
+      `).join('')}</tbody></table>
+    </div>
+    `}
+  `;
+}
+function bindPengambilan(){
+  if(!DB.items.length) return;
+  document.getElementById('btnPrintPengambilan').addEventListener('click', ()=>{
+    const date = document.getElementById('pengambilanDate').value || todayISO();
+    const copies = Math.min(50, Math.max(1, Number(document.getElementById('pengambilanCopies').value||1)));
+    printPengambilan(date, copies);
+  });
+}
+function printPengambilan(date, copies){
+  const rows = DB.items.map(item=>({
+    code:item.code, name:item.name, unit:item.unit||'', location:item.location||'',
+    stock:currentStock(item.code)
+  }));
+  const page = `
+    <section class="pengambilan-print-page">
+      <div class="kartu-print-head">
+        <div class="co">${esc(DB.settings.company||'Nama Perusahaan')}</div>
+        <div class="addr">${esc(DB.settings.address||'')}</div>
+      </div>
+      <div class="kartu-print-title">FORM PENGAMBILAN BARANG</div>
+      <div class="kartu-meta">
+        <div><span class="k">Tanggal Pengambilan</span>: ${fmtDate(date)}</div>
+        <div><span class="k">No. Form</span>: ____________________</div>
+        <div><span class="k">Pemohon / Bagian</span>: ______________________________________________</div>
+        <div><span class="k">Keperluan</span>: ________________________________________________________</div>
+      </div>
+      <table>
+        <thead><tr><th>No</th><th>Kode</th><th>Nama Barang</th><th>Satuan</th><th>Lokasi</th><th class="num">Stok Saat Ini</th><th class="num">Jumlah Diambil</th><th>Keterangan</th></tr></thead>
+        <tbody>${rows.map((row,index)=>`
+          <tr><td>${index+1}</td><td>${esc(row.code)}</td><td>${esc(row.name)}</td><td>${esc(row.unit)}</td>
+          <td>${esc(row.location)}</td><td class="num">${fmtNum(row.stock)}</td><td class="manual-cell"></td><td class="manual-cell"></td></tr>
+        `).join('')}</tbody>
+      </table>
+      <div class="sig">
+        <div><div class="line">Yang mengambil</div></div>
+        <div><div class="line">Disetujui / Admin Gudang</div></div>
+        <div><div class="line">Mengetahui</div></div>
+      </div>
+    </section>
+  `;
+  document.getElementById('printArea').innerHTML = Array.from({length:copies}, ()=>page).join('');
+  window.print();
 }
 
 /* =========================================================
